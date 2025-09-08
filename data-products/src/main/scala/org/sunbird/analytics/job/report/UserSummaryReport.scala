@@ -36,7 +36,7 @@ object UserSummaryReport extends IJob with BaseReportsJob {
   private val userCacheDBSettings = Map("table" -> "user", "infer.schema" -> "true", "key.column" -> "userid")
   private val userEnrolmentDBSettings = Map("table" -> "user_enrolments", "keyspace" -> AppConf.getConfig("sunbird.user.report.keyspace"), "cluster" -> "ReportCluster");
   private val encryptedFields = Array("email", "phone");
-  private val reportCols = Seq("userid", "firstname", "lastname", "username", "email", "usertype", "cin", "fmpsid", "province", "designation", "orgname", "createddate", "num_courses_enrolled", "num_courses_started", "num_courses_completed", "course_metrics")
+  private val reportCols = Seq("userid", "firstname", "lastname", "username", "email", "usertype", "cin", "fmpsid", "province", "designation", "training_group", "orgname", "createddate", "num_courses_enrolled", "num_courses_started", "num_courses_completed", "course_metrics")
 
 
   val connProperties: Properties = CommonUtil.getPostgresConnectionProps()
@@ -69,7 +69,7 @@ object UserSummaryReport extends IJob with BaseReportsJob {
   }
 
   def getUserCacheColumns(): Seq[String] = {
-    Seq("userid", "firstname", "lastname", "email", "orgname", "rootorgid", "usertype", "username", "cin", "fmpsid", "province", "createddate", "designation")
+    Seq("userid", "firstname", "lastname", "email", "orgname", "rootorgid", "usertype", "username", "cin", "fmpsid", "province", "createddate", "designation", "training_group")
   }
 
   def getUserEnrolromentColumns(): Seq[String] = {
@@ -94,6 +94,7 @@ object UserSummaryReport extends IJob with BaseReportsJob {
       .withColumn("fmpsid", UDFUtils.extractFMPSID(col("profileConfig")))
       .withColumn("province", UDFUtils.extractProvince(col("profileConfig")))
       .withColumn("designation", UDFUtils.extractDesignation(col("profileConfig")))
+      .withColumn("training_group", UDFUtils.extractTrainingGroup(col("profileConfig")))
     val selectedDF = df.select(cols.head, cols.tail: _*)
       .repartition(AppConf.getConfig("exhaust.user.parallelism").toInt, col("userid"))
     selectedDF.persist()
