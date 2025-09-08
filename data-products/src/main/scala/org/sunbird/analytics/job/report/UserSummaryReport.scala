@@ -130,18 +130,18 @@ object UserSummaryReport extends IJob with BaseReportsJob {
     // Compute metrics per user
     val userCourseAggDF = userJoinedDF.groupBy("userid")
       .agg(
-        count(when(col("enrolleddate").isNotNull, true)).as("num_courses_enrolled"),
-        count(when((col("progress") > 0 || col("status") === 1) && col("enrolleddate").isNotNull, true)).as("num_courses_started"),
-        count(when((col("status") === 2) && col("enrolleddate").isNotNull, true)).as("num_courses_completed"),
+        size(collect_set(when(col("enrolleddate").isNotNull, col("courseid")))).as("num_courses_enrolled"),
+        size(collect_set(when((col("status") === 1) && col("enrolleddate").isNotNull, col("courseid")))).as("num_courses_started"),
+        size(collect_set(when((col("status") === 2) && col("enrolleddate").isNotNull, col("courseid")))).as("num_courses_completed"),
+
         collect_set(when(col("enrolleddate").isNotNull, col("courseid"))).as("courses_enrolled"),
-        collect_set(when((col("progress") > 0 || col("status") === 1) && col("enrolleddate").isNotNull, col("courseid"))).as("courses_started"),
+        collect_set(when((col("status") === 1) && col("enrolleddate").isNotNull, col("courseid"))).as("courses_started"),
         collect_set(when((col("status") === 2) && col("enrolleddate").isNotNull, col("courseid"))).as("courses_completed")
       )
     // Join back to user info for reporting
     val userSummaryDF = userCachedDF.join(userCourseAggDF, Seq("userid"), "left")
       .na.fill(0, Seq("num_courses_enrolled", "num_courses_started", "num_courses_completed"))
     val decryptedSummary = decryptUserInfo(userSummaryDF)
-
     // Step 1: Collect all unique course IDs from the DataFrame
     val allCourseIds = decryptedSummary
       .select(explode(flatten(array(col("courses_enrolled"), col("courses_started"), col("courses_completed")))))
