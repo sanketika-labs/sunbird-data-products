@@ -33,7 +33,8 @@ object CollectionBatchStatusUpdaterJob extends IJob with BaseReportsJob {
     implicit val spark: SparkSession = openSparkSession(jobConfig)
     implicit val sc: SparkContext = spark.sparkContext
     try {
-      spark.setCassandraConf("LMSCluster", CassandraConnectorConf.ConnectionHostParam.option(AppConf.getConfig("sunbird.courses.cluster.host")))
+      val host = AppConf.getConfig("sunbird.courses.cluster.host")
+      spark.setCassandraConf("LMSCluster", CassandraConnectorConf.ConnectionHostParam.option(host))
       val res = CommonUtil.time(execute(fetchData))
       JobLogger.end(s"$jobName completed execution", "SUCCESS", Option(Map(
         "time-taken" -> res._1,
@@ -43,6 +44,7 @@ object CollectionBatchStatusUpdaterJob extends IJob with BaseReportsJob {
       )))
     } catch {
       case ex: Exception =>
+        ex.printStackTrace()
         JobLogger.log(ex.getMessage, None, ERROR);
         JobLogger.end(s"$jobName execution failed", "FAILED", Option(Map("model" -> jobName, "statusMsg" -> ex.getMessage)));
     }
@@ -73,7 +75,7 @@ object CollectionBatchStatusUpdaterJob extends IJob with BaseReportsJob {
       .drop("status").withColumnRenamed("updated_status", "status")
     if (!finalDF.isEmpty) {
       JobLogger.log(s"Writing records into database", None, INFO)
-      finalDF.select("courseid", "batchid", "status").write.format("org.apache.spark.sql.cassandra").options(collectionBatchDBSettings ++ Map("confirm.truncate" -> "false")).mode(SaveMode.Append).save()
+      finalDF.select("activityid", "batchid", "status").write.format("org.apache.spark.sql.cassandra").options(collectionBatchDBSettings ++ Map("confirm.truncate" -> "false")).mode(SaveMode.Append).save()
     } else {
       JobLogger.log("No records found to update the db", None, INFO)
     }
@@ -86,7 +88,7 @@ object CollectionBatchStatusUpdaterJob extends IJob with BaseReportsJob {
       .withColumn("startdate", convertDate(col("start_date")))
       .withColumn("enddate", convertDate(col("end_date")))
       .withColumn("enrollmentenddate", convertDate(col("enrollment_enddate")))
-      .select("courseid", "batchid", "startdate", "name", "enddate", "enrollmentenddate", "enrollmenttype", "createdfor", "status").cache()
+      .select("activityid", "activitytype", "batchid", "start_date", "name", "end_date", "enrollment_enddate", "enrollmenttype", "createdfor", "status", "startdate", "enddate", "enrollmentenddate").cache()
   }
 
 
