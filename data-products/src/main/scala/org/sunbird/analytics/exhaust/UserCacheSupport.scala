@@ -22,7 +22,7 @@ trait UserCacheSupport {
     Seq("userid", "firstname", "lastname", "email", "orgname", "rootorgid", "usertype", "username", "cin", "fmpsid", "province", "createddate", "designation", "training_group")
   }
 
-  def getUserCacheDF(spark: SparkSession, fetchData: (SparkSession, Map[String, String], String, StructType) => DataFrame): DataFrame = {
+  def getUserCacheDF(fetchData: (SparkSession, Map[String, String], String, StructType) => DataFrame)(implicit spark: SparkSession): DataFrame = {
     val cols = getUserCacheColumns()
     val schema = spark.implicits.newProductEncoder[org.sunbird.analytics.job.report.UserCols].schema
     val df = fetchData(spark, userCacheDBSettings, redisFormat, schema)

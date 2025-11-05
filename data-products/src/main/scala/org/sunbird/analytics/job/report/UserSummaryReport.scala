@@ -57,7 +57,7 @@ object UserSummaryReport extends IJob with BaseReportsJob with UserCacheSupport 
     implicit val frameworkContext: FrameworkContext = getReportingFrameworkContext()
     init()
     try {
-      val res = CommonUtil.time(prepareReport(spark, fetchData))
+      val res = CommonUtil.time(prepareReport(fetchData))
       val reportData = res._2
       saveToBlob(reportData, jobConfig) // Saving report to blob storage
       saveToPostgres(reportData)
@@ -82,7 +82,7 @@ object UserSummaryReport extends IJob with BaseReportsJob with UserCacheSupport 
   }
 
   // $COVERAGE-ON$
-  def getUserEnrollment(spark: SparkSession, fetchData: (SparkSession, Map[String, String], String, StructType) => DataFrame): DataFrame = {
+  def getUserEnrollment(fetchData: (SparkSession, Map[String, String], String, StructType) => DataFrame)(implicit spark: SparkSession): DataFrame = {
     val cols = getUserEnrolromentColumns()
     val df = fetchData(spark, userEnrolmentDBSettings, cassandraUrl, new StructType())
       .filter(lower(col("active")).equalTo("true"))
@@ -91,7 +91,7 @@ object UserSummaryReport extends IJob with BaseReportsJob with UserCacheSupport 
       .repartition(AppConf.getConfig("exhaust.user.parallelism").toInt, col("userid"))
   }
 
-  def getCourseBatchDF(spark: SparkSession, fetchData: (SparkSession, Map[String, String], String, StructType) => DataFrame): DataFrame = {
+  def getCourseBatchDF(fetchData: (SparkSession, Map[String, String], String, StructType) => DataFrame)(implicit spark: SparkSession): DataFrame = {
     fetchData(spark, courseBatchDBSettings, cassandraUrl, new StructType())
       .select("courseid", "batchid", "name", "start_date", "end_date")
   }
@@ -158,11 +158,10 @@ object UserSummaryReport extends IJob with BaseReportsJob with UserCacheSupport 
     }
   }
 
-  def prepareReport(spark: SparkSession, fetchData: (SparkSession, Map[String, String], String, StructType) => DataFrame)(implicit fc: FrameworkContext, config: JobConfig): DataFrame = {
-    implicit val sparkSession: SparkSession = spark
-    val userEnrolmentDF = getUserEnrollment(spark, fetchData)
-    val userCachedDF = getUserCacheDF(spark, fetchData)
-    val courseBatchDF = getCourseBatchDF(spark, fetchData) // Now includes batch name
+  def prepareReport(fetchData: (SparkSession, Map[String, String], String, StructType) => DataFrame)(implicit spark: SparkSession, fc: FrameworkContext, config: JobConfig): DataFrame = {
+    val userEnrolmentDF = getUserEnrollment(fetchData)
+    val userCachedDF = getUserCacheDF(fetchData)
+    val courseBatchDF = getCourseBatchDF(fetchData) // Now includes batch name
 
     // Clean user enrolments and course batch
     val cleanUserEnrolmentDF = userEnrolmentDF.filter(
